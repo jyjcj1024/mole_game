@@ -1,8 +1,17 @@
+<!-- ✅ 포함된 기능 요약
+- 🔢 난이도 선택 콤보박스
+- 🕹️ 게임 시작 시 “레벨 X 시작합니다” + 3초 카운트다운
+- 🧠 난이도별 구멍 수 및 두더지 수 자동 조절
+- 🧑‍💻 닉네임 입력 후 Firebase에 점수 저장
+- 📊 랭킹 확인 시 Firebase에서 해당 레벨의 상위 10명만 불러오기
+- 📱 반응형 디자인으로 모바일에서도 스크롤 없이 플레이 가
+ -->
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>두더지 게임</title>
   <style>
     body {
@@ -16,18 +25,17 @@
     header {
       padding: 10px;
       background-color: #f0f0f0;
-      font-size: 18px;
     }
 
     #startBtn, #rankingBtn {
       padding: 10px 20px;
       font-size: 16px;
-      margin: 10px;
+      margin: 5px;
     }
 
-    #levelDisplay {
-      font-weight: bold;
-      margin-top: 5px;
+    #levelSelect {
+      font-size: 16px;
+      margin: 5px;
     }
 
     .holes {
@@ -64,7 +72,13 @@
       pointer-events: auto;
     }
 
-    #rankingModal {
+    #countdown {
+      font-size: 36px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    #rankingDisplay {
       position: fixed;
       top: 10%;
       left: 50%;
@@ -79,16 +93,12 @@
       z-index: 1000;
     }
 
-    #rankingModal h3 {
+    #rankingDisplay h3 {
       margin-top: 0;
     }
 
     #rankingContent {
-      min-height: 100px;
-    }
-
-    #rankingControls {
-      margin-top: 10px;
+      text-align: left;
     }
 
     #overlay {
@@ -101,77 +111,92 @@
       display: none;
       z-index: 999;
     }
-
-    #countdown {
-      font-size: 48px;
-      font-weight: bold;
-      margin-top: 20px;
-    }
   </style>
 </head>
 <body>
-<header>
-  <h1>두더지 잡기!</h1>
-  <p id="instruction">🎮 시작을 눌러 레벨을 선택하세요</p> <!-- 👈 안내 문구 추가 -->
-  <div id="levelDisplay">레벨: 1</div>
-
-  <label for="levelSelect">난이도 선택:</label>
-  <select id="levelSelect">
-    <option value="1">레벨 1</option>
-    <option value="2">레벨 2</option>
-    <option value="3">레벨 3</option>
-    <option value="4">레벨 4</option>
-    <option value="5">레벨 5</option>
-  </select>
-
-  <button id="startBtn">게임 시작</button>
-  <button id="rankingBtn">랭킹 확인</button>
-  <p>점수: <span id="score">0</span></p>
-  <p>남은 시간: <span id="time">30</span>초</p>
-  <div id="countdown"></div>
-</header>
+  <header>
+    <h1>두더지 잡기!</h1>
+    <p id="instruction">🎮 시작을 누르고 난이도를 선택하세요</p>
+    <label for="levelSelect">난이도 선택:</label>
+    <select id="levelSelect">
+      <option value="1">레벨 1</option>
+      <option value="2">레벨 2</option>
+      <option value="3">레벨 3</option>
+      <option value="4">레벨 4</option>
+      <option value="5">레벨 5</option>
+    </select>
+    <div id="levelDisplay">레벨: 1</div>
+    <button id="startBtn">게임 시작</button>
+    <button id="rankingBtn">랭킹 확인</button>
+    <p>점수: <span id="score">0</span></p>
+    <p>남은 시간: <span id="time">30</span>초</p>
+    <div id="countdown"></div>
+  </header>
 
   <div class="holes" id="holesContainer"></div>
 
   <div id="overlay"></div>
-  <div id="rankingModal">
-    <h3>난이도 <span id="rankingLevel">1</span> 랭킹</h3>
+  <div id="rankingDisplay">
+    <h3>레벨별 상위 10명 랭킹</h3>
     <div id="rankingContent"></div>
-    <div id="rankingControls">
-      <button id="prevLevel">← 이전</button>
-      <button id="nextLevel">다음 →</button>
-      <button id="closeRanking">닫기</button>
-    </div>
+    <button onclick="closeRanking()">닫기</button>
   </div>
 
-  <script>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+    import { getDatabase, ref, push, query, orderByChild, limitToLast, get } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDKTxGuQYjZlKiteYhbwApwcYKpXeGufoc",
+      authDomain: "molegame-e285f.firebaseapp.com",
+      projectId: "molegame-e285f",
+      storageBucket: "molegame-e285f.appspot.com",
+      messagingSenderId: "162520966799",
+      appId: "1:162520966799:web:8624d770309ae0654db2fa",
+      measurementId: "G-LDPZZX81H4"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
     let score = 0;
     let timeLeft = 30;
+    let level = 1;
     let gameInterval;
     let timerInterval;
-    let level = 1;
+
     const scoreDisplay = document.getElementById('score');
     const timeDisplay = document.getElementById('time');
-    const startBtn = document.getElementById('startBtn');
-    const rankingBtn = document.getElementById('rankingBtn');
-    const holesContainer = document.getElementById('holesContainer');
     const levelDisplay = document.getElementById('levelDisplay');
     const countdownDisplay = document.getElementById('countdown');
-    const overlay = document.getElementById('overlay');
-    const rankingModal = document.getElementById('rankingModal');
-    const rankingContent = document.getElementById('rankingContent');
-    const rankingLevel = document.getElementById('rankingLevel');
-    const prevLevelBtn = document.getElementById('prevLevel');
-    const nextLevelBtn = document.getElementById('nextLevel');
-    const closeRankingBtn = document.getElementById('closeRanking');
-    const rankings = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+    const holesContainer = document.getElementById('holesContainer');
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+      level = parseInt(document.getElementById('levelSelect').value);
+      levelDisplay.textContent = `레벨: ${level}`;
+      startCountdown(startGame);
+    });
+
+    function startCountdown(callback) {
+      countdownDisplay.textContent = `레벨 ${level} 시작합니다`;
+      let count = 3;
+      const interval = setInterval(() => {
+        countdownDisplay.textContent = count;
+        count--;
+        if (count < 0) {
+          clearInterval(interval);
+          countdownDisplay.textContent = '';
+          callback();
+        }
+      }, 1000);
+    }
 
     function createHoles(count) {
       holesContainer.innerHTML = '';
       for (let i = 0; i < count; i++) {
         const hole = document.createElement('div');
         hole.classList.add('hole');
-        hole.id = `hole${i + 1}`;
         holesContainer.appendChild(hole);
       }
     }
@@ -191,6 +216,9 @@
         const mole = document.createElement('div');
         mole.classList.add('mole');
 
+        mole.addEventListener('click', hitMole);
+        mole.addEventListener('touchstart', hitMole, { passive: false });
+
         function hitMole(e) {
           e.preventDefault();
           score++;
@@ -198,29 +226,9 @@
           mole.remove();
         }
 
-        mole.addEventListener('click', hitMole);
-        mole.addEventListener('touchstart', hitMole, { passive: false });
-
         hole.appendChild(mole);
-
-        setTimeout(() => {
-          mole.remove();
-        }, 1500);
+        setTimeout(() => mole.remove(), 1500);
       }
-    }
-
-    function startCountdown(callback) {
-      countdownDisplay.textContent = `레벨 ${level} 시작합니다`;
-      let count = 3;
-      const interval = setInterval(() => {
-        countdownDisplay.textContent = count;
-        count--;
-        if (count < 0) {
-          clearInterval(interval);
-          countdownDisplay.textContent = '';
-          callback();
-        }
-      }, 1000);
     }
 
     function startGame() {
@@ -228,8 +236,6 @@
       timeLeft = 30;
       scoreDisplay.textContent = score;
       timeDisplay.textContent = timeLeft;
-      levelDisplay.textContent = `레벨: ${level}`;
-      startBtn.disabled = true;
 
       const holeCounts = { 1: 7, 2: 15, 3: 25, 4: 30, 5: 40 };
       createHoles(holeCounts[level]);
@@ -250,11 +256,11 @@
       alert(`게임 종료! 당신의 점수는 ${score}점입니다.`);
       const nickname = prompt("닉네임을 입력하세요:");
       if (nickname) {
-        rankings[level].push({ name: nickname, score });
-        rankings[level].sort((a, b) => b.score - a.score);
+                const scoresRef = ref(db, `rankings/level${level}`);
+        push(scoresRef, { name: nickname, score });
       }
 
-            if (level < 5) {
+      if (level < 5) {
         const next = confirm("다음 레벨로 진행하시겠습니까?");
         if (next) {
           level++;
@@ -263,56 +269,38 @@
           return;
         }
       }
-
-      startBtn.disabled = false;
     }
 
-    function showRanking(levelNum) {
-      rankingLevel.textContent = levelNum;
-      const entries = rankings[levelNum];
-      rankingContent.innerHTML = '';
+    // 🔍 랭킹 불러오기 및 표시
+    document.getElementById('rankingBtn').addEventListener('click', async () => {
+      const selectedLevel = parseInt(document.getElementById('levelSelect').value);
+      const scoresRef = query(ref(db, `rankings/level${selectedLevel}`), orderByChild('score'), limitToLast(10));
+      const snapshot = await get(scoresRef);
+      const data = [];
+      snapshot.forEach(child => {
+        data.push(child.val());
+      });
+      data.reverse(); // 높은 점수 순
 
-      if (entries.length === 0) {
-        rankingContent.innerHTML = `<p>기록 없음</p>`;
+      const rankingContent = document.getElementById('rankingContent');
+      rankingContent.innerHTML = '';
+      if (data.length === 0) {
+        rankingContent.innerHTML = '<p>기록 없음</p>';
       } else {
-        entries.forEach((entry, idx) => {
+        data.forEach((entry, idx) => {
           rankingContent.innerHTML += `<p>${idx + 1}. ${entry.name} - ${entry.score}점</p>`;
         });
       }
 
-      overlay.style.display = 'block';
-      rankingModal.style.display = 'block';
-    }
-
-    startBtn.addEventListener('click', () => {
-      level = parseInt(document.getElementById('levelSelect').value);
-      levelDisplay.textContent = `레벨: ${level}`;
-      startCountdown(startGame);
+      document.getElementById('overlay').style.display = 'block';
+      document.getElementById('rankingDisplay').style.display = 'block';
     });
 
-
-    rankingBtn.addEventListener('click', () => {
-      showRanking(level);
-    });
-
-    prevLevelBtn.addEventListener('click', () => {
-      if (level > 1) {
-        level--;
-        showRanking(level);
-      }
-    });
-
-    nextLevelBtn.addEventListener('click', () => {
-      if (level < 5) {
-        level++;
-        showRanking(level);
-      }
-    });
-
-    closeRankingBtn.addEventListener('click', () => {
-      overlay.style.display = 'none';
-      rankingModal.style.display = 'none';
-    });
+    // 🔙 랭킹 닫기
+    window.closeRanking = function () {
+      document.getElementById('overlay').style.display = 'none';
+      document.getElementById('rankingDisplay').style.display = 'none';
+    };
   </script>
 </body>
 </html>
