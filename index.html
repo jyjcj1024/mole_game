@@ -38,7 +38,11 @@
       margin: 5px;
     }
 
-    .holes {
+    .hidden {
+        display: none !important;
+      }
+
+    /* .holes {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
       gap: 5px;
@@ -55,6 +59,21 @@
       position: relative;
       border-radius: 50%;
       overflow: hidden;
+    } */
+
+    .holes {
+      position: relative;
+      width: 100vw;
+      height: calc(100vh - 20px); /* header 숨김 기준으로 조정 */
+      overflow: hidden;
+    }
+
+    .hole {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      background-color: #ccc;
+      border-radius: 50%;
     }
 
     .mole {
@@ -172,6 +191,18 @@
     const countdownDisplay = document.getElementById('countdown');
     const holesContainer = document.getElementById('holesContainer');
 
+    const header = document.querySelector('header');
+
+    function startGame() {
+      header.classList.add('hidden'); // 게임 시작 시 숨김
+      // 기존 startGame 코드 유지
+    }
+
+    function endGame() {
+      header.classList.remove('hidden'); // 게임 종료 시 다시 보임
+      // 기존 endGame 코드 유지
+    }
+
     document.getElementById('startBtn').addEventListener('click', () => {
       level = parseInt(document.getElementById('levelSelect').value);
       levelDisplay.textContent = `레벨: ${level}`;
@@ -194,9 +225,19 @@
 
     function createHoles(count) {
       holesContainer.innerHTML = '';
+      const containerWidth = holesContainer.offsetWidth;
+      const containerHeight = holesContainer.offsetHeight;
+
       for (let i = 0; i < count; i++) {
         const hole = document.createElement('div');
         hole.classList.add('hole');
+
+        const x = Math.random() * (containerWidth - 60);
+        const y = Math.random() * (containerHeight - 60);
+
+        hole.style.left = `${x}px`;
+        hole.style.top = `${y}px`;
+
         holesContainer.appendChild(hole);
       }
     }
@@ -275,25 +316,31 @@
     document.getElementById('rankingBtn').addEventListener('click', async () => {
       const selectedLevel = parseInt(document.getElementById('levelSelect').value);
       const scoresRef = query(ref(db, `rankings/level${selectedLevel}`), orderByChild('score'), limitToLast(10));
-      const snapshot = await get(scoresRef);
-      const data = [];
-      snapshot.forEach(child => {
-        data.push(child.val());
-      });
-      data.reverse(); // 높은 점수 순
 
-      const rankingContent = document.getElementById('rankingContent');
-      rankingContent.innerHTML = '';
-      if (data.length === 0) {
-        rankingContent.innerHTML = '<p>기록 없음</p>';
-      } else {
-        data.forEach((entry, idx) => {
-          rankingContent.innerHTML += `<p>${idx + 1}. ${entry.name} - ${entry.score}점</p>`;
+      try {
+        const snapshot = await get(scoresRef);
+        const data = [];
+        snapshot.forEach(child => {
+          data.push(child.val());
         });
-      }
+        data.reverse(); // 높은 점수 순
 
-      document.getElementById('overlay').style.display = 'block';
-      document.getElementById('rankingDisplay').style.display = 'block';
+        const rankingContent = document.getElementById('rankingContent');
+        rankingContent.innerHTML = '';
+        if (data.length === 0) {
+          rankingContent.innerHTML = '<p>기록 없음</p>';
+        } else {
+          data.forEach((entry, idx) => {
+            rankingContent.innerHTML += `<p>${idx + 1}. ${entry.name} - ${entry.score}점</p>`;
+          });
+        }
+
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('rankingDisplay').style.display = 'block';
+      } catch (error) {
+        console.error("랭킹 불러오기 실패:", error);
+        alert("랭킹 데이터를 불러오는 데 문제가 발생했습니다.");
+      }
     });
 
     // 🔙 랭킹 닫기
