@@ -8,7 +8,15 @@
     body {
       font-family: sans-serif;
       text-align: center;
-      margin: 20px;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    header {
+      padding: 10px;
+      background-color: #f0f0f0;
+      font-size: 18px;
     }
 
     #startBtn, #rankingBtn {
@@ -17,21 +25,26 @@
       margin: 10px;
     }
 
+    #levelDisplay {
+      font-weight: bold;
+      margin-top: 5px;
+    }
+
     .holes {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+      gap: 5px;
       padding: 10px;
-      width: 100%;
-      max-width: 800px;
-      margin: 0 auto;
+      width: 100vw;
+      height: calc(100vh - 180px);
+      box-sizing: border-box;
     }
 
     .hole {
       width: 100%;
-      padding-top: 100%;
-      position: relative;
+      aspect-ratio: 1 / 1;
       background-color: #ccc;
+      position: relative;
       border-radius: 50%;
       overflow: hidden;
     }
@@ -51,33 +64,85 @@
       pointer-events: auto;
     }
 
-    #rankingDisplay {
-      margin-top: 20px;
-      text-align: left;
-      max-width: 500px;
-      margin: 20px auto;
-      background: #f9f9f9;
-      padding: 10px;
+    #rankingModal {
+      position: fixed;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 400px;
+      background: white;
+      border: 2px solid #888;
       border-radius: 10px;
+      padding: 20px;
       display: none;
+      z-index: 1000;
     }
 
-    @media (max-width: 400px) {
-      #startBtn, #rankingBtn {
-        font-size: 14px;
-        padding: 8px 16px;
-      }
+    #rankingModal h3 {
+      margin-top: 0;
+    }
+
+    #rankingContent {
+      min-height: 100px;
+    }
+
+    #rankingControls {
+      margin-top: 10px;
+    }
+
+    #overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      z-index: 999;
+    }
+
+    #countdown {
+      font-size: 48px;
+      font-weight: bold;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
+<header>
   <h1>두더지 잡기!</h1>
+  <p id="instruction">🎮 시작을 눌러 레벨을 선택하세요</p> <!-- 👈 안내 문구 추가 -->
+  <div id="levelDisplay">레벨: 1</div>
+
+  <label for="levelSelect">난이도 선택:</label>
+  <select id="levelSelect">
+    <option value="1">레벨 1</option>
+    <option value="2">레벨 2</option>
+    <option value="3">레벨 3</option>
+    <option value="4">레벨 4</option>
+    <option value="5">레벨 5</option>
+  </select>
+
   <button id="startBtn">게임 시작</button>
   <button id="rankingBtn">랭킹 확인</button>
   <p>점수: <span id="score">0</span></p>
   <p>남은 시간: <span id="time">30</span>초</p>
+  <div id="countdown"></div>
+</header>
+
   <div class="holes" id="holesContainer"></div>
-  <div id="rankingDisplay"></div>
+
+  <div id="overlay"></div>
+  <div id="rankingModal">
+    <h3>난이도 <span id="rankingLevel">1</span> 랭킹</h3>
+    <div id="rankingContent"></div>
+    <div id="rankingControls">
+      <button id="prevLevel">← 이전</button>
+      <button id="nextLevel">다음 →</button>
+      <button id="closeRanking">닫기</button>
+    </div>
+  </div>
 
   <script>
     let score = 0;
@@ -90,7 +155,15 @@
     const startBtn = document.getElementById('startBtn');
     const rankingBtn = document.getElementById('rankingBtn');
     const holesContainer = document.getElementById('holesContainer');
-    const rankingDisplay = document.getElementById('rankingDisplay');
+    const levelDisplay = document.getElementById('levelDisplay');
+    const countdownDisplay = document.getElementById('countdown');
+    const overlay = document.getElementById('overlay');
+    const rankingModal = document.getElementById('rankingModal');
+    const rankingContent = document.getElementById('rankingContent');
+    const rankingLevel = document.getElementById('rankingLevel');
+    const prevLevelBtn = document.getElementById('prevLevel');
+    const nextLevelBtn = document.getElementById('nextLevel');
+    const closeRankingBtn = document.getElementById('closeRanking');
     const rankings = { 1: [], 2: [], 3: [], 4: [], 5: [] };
 
     function createHoles(count) {
@@ -110,9 +183,8 @@
     }
 
     function showMoles() {
-      let moleCount = 1;
-      if (level === 3 || level === 4) moleCount = Math.random() < 0.5 ? 1 : 2;
-      if (level === 5) moleCount = Math.floor(Math.random() * 3) + 1;
+      const maxMoles = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 5 }[level];
+      const moleCount = Math.floor(Math.random() * maxMoles) + 1;
 
       for (let i = 0; i < moleCount; i++) {
         const hole = randomHole();
@@ -137,15 +209,29 @@
       }
     }
 
+    function startCountdown(callback) {
+      countdownDisplay.textContent = `레벨 ${level} 시작합니다`;
+      let count = 3;
+      const interval = setInterval(() => {
+        countdownDisplay.textContent = count;
+        count--;
+        if (count < 0) {
+          clearInterval(interval);
+          countdownDisplay.textContent = '';
+          callback();
+        }
+      }, 1000);
+    }
+
     function startGame() {
       score = 0;
       timeLeft = 30;
       scoreDisplay.textContent = score;
       timeDisplay.textContent = timeLeft;
+      levelDisplay.textContent = `레벨: ${level}`;
       startBtn.disabled = true;
-      rankingDisplay.style.display = 'none';
 
-      const holeCounts = { 1: 7, 2: 10, 3: 15, 4: 20, 5: 30 };
+      const holeCounts = { 1: 7, 2: 15, 3: 25, 4: 30, 5: 40 };
       createHoles(holeCounts[level]);
 
       gameInterval = setInterval(showMoles, 800);
@@ -168,11 +254,12 @@
         rankings[level].sort((a, b) => b.score - a.score);
       }
 
-      if (level < 5) {
+            if (level < 5) {
         const next = confirm("다음 레벨로 진행하시겠습니까?");
         if (next) {
           level++;
-          startGame();
+          levelDisplay.textContent = `레벨: ${level}`;
+          startCountdown(startGame);
           return;
         }
       }
@@ -180,28 +267,52 @@
       startBtn.disabled = false;
     }
 
-    function showRankings() {
-      rankingDisplay.innerHTML = `<h3>난이도별 랭킹</h3>`;
-      for (let i = 1; i <= 5; i++) {
-        rankingDisplay.innerHTML += `<strong>난이도 ${i}</strong><br>`;
-        if (rankings[i].length === 0) {
-          rankingDisplay.innerHTML += `- 기록 없음<br>`;
-        } else {
-          rankings[i].forEach((entry, idx) => {
-            rankingDisplay.innerHTML += `${idx + 1}. ${entry.name} - ${entry.score}점<br>`;
-          });
-        }
-        rankingDisplay.innerHTML += `<br>`;
+    function showRanking(levelNum) {
+      rankingLevel.textContent = levelNum;
+      const entries = rankings[levelNum];
+      rankingContent.innerHTML = '';
+
+      if (entries.length === 0) {
+        rankingContent.innerHTML = `<p>기록 없음</p>`;
+      } else {
+        entries.forEach((entry, idx) => {
+          rankingContent.innerHTML += `<p>${idx + 1}. ${entry.name} - ${entry.score}점</p>`;
+        });
       }
-      rankingDisplay.style.display = 'block';
+
+      overlay.style.display = 'block';
+      rankingModal.style.display = 'block';
     }
 
     startBtn.addEventListener('click', () => {
-      level = 1;
-      startGame();
+      level = parseInt(document.getElementById('levelSelect').value);
+      levelDisplay.textContent = `레벨: ${level}`;
+      startCountdown(startGame);
     });
 
-    rankingBtn.addEventListener('click', showRankings);
+
+    rankingBtn.addEventListener('click', () => {
+      showRanking(level);
+    });
+
+    prevLevelBtn.addEventListener('click', () => {
+      if (level > 1) {
+        level--;
+        showRanking(level);
+      }
+    });
+
+    nextLevelBtn.addEventListener('click', () => {
+      if (level < 5) {
+        level++;
+        showRanking(level);
+      }
+    });
+
+    closeRankingBtn.addEventListener('click', () => {
+      overlay.style.display = 'none';
+      rankingModal.style.display = 'none';
+    });
   </script>
 </body>
 </html>
