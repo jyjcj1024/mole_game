@@ -76,11 +76,17 @@
       const hole = randomHole();
       const mole = document.createElement('div');
       mole.classList.add('mole');
-      mole.addEventListener('click', () => {
+      mole.addEventListener('click', hitMole);
+      mole.addEventListener('touchstart', hitMole);
+
+      function hitMole(e) {
+        e.preventDefault(); // 모바일에서 터치 후 클릭 중복 방지
         score++;
         scoreDisplay.textContent = score;
-        mole.remove();
-      });
+        e.target.remove();
+         }
+
+
       hole.appendChild(mole);
 
       setTimeout(() => {
@@ -112,3 +118,4 @@
   </script>
 </body>
 </html>
+
