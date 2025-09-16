@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>두더지 게임</title>
   <style>
     body {
@@ -24,16 +25,19 @@
       border-radius: 50%;
     }
     .mole {
-        width: 100px;
-        height: 100px;
-        background-image: url('mole.png');
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-position: center;
-        border-radius: 50%;
-        }
-
-    
+      width: 100px;
+      height: 100px;
+      background-image: url('mole.png');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center;
+      border-radius: 50%;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      cursor: pointer;
+      pointer-events: auto;
+    }
     #startBtn {
       padding: 10px 20px;
       font-size: 16px;
@@ -47,7 +51,6 @@
   <p>점수: <span id="score">0</span></p>
   <p>남은 시간: <span id="time">30</span>초</p>
   <div class="holes" id="holesContainer">
-    <!-- 7개의 구멍 생성 -->
     <div class="hole" id="hole1"></div>
     <div class="hole" id="hole2"></div>
     <div class="hole" id="hole3"></div>
@@ -76,22 +79,22 @@
       const hole = randomHole();
       const mole = document.createElement('div');
       mole.classList.add('mole');
-      mole.addEventListener('click', hitMole);
-      mole.addEventListener('touchstart', hitMole);
 
       function hitMole(e) {
-        e.preventDefault(); // 모바일에서 터치 후 클릭 중복 방지
+        e.preventDefault(); // 모바일 중복 방지
         score++;
         scoreDisplay.textContent = score;
-        e.target.remove();
-         }
+        mole.remove();
+      }
 
+      mole.addEventListener('click', hitMole);
+      mole.addEventListener('touchstart', hitMole, { passive: false });
 
       hole.appendChild(mole);
 
       setTimeout(() => {
         mole.remove();
-      }, 1000);
+      }, 1500); // 두더지 지속 시간 늘림
     }
 
     function startGame() {
@@ -118,4 +121,3 @@
   </script>
 </body>
 </html>
-
