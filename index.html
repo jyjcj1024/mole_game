@@ -1,11 +1,12 @@
-<!-- ✅ 포함된 기능 요약
-- 🔢 난이도 선택 콤보박스
-- 🕹️ 게임 시작 시 “레벨 X 시작합니다” + 3초 카운트다운
-- 🧠 난이도별 구멍 수 및 두더지 수 자동 조절
+<!-- 
+✅ 포함된 기능
+- 🔢 난이도 선택 및 레벨별 구멍/두더지 수 자동 조절
+- 🕹️ 게임 시작 시 카운트다운 + UI 숨김
 - 🧑‍💻 닉네임 입력 후 Firebase에 점수 저장
-- 📊 랭킹 확인 시 Firebase에서 해당 레벨의 상위 10명만 불러오기
-- 📱 반응형 디자인으로 모바일에서도 스크롤 없이 플레이 가
- -->
+- 📊 랭킹 확인 시 레벨별 상위 10명 표시
+- ⏪⏩ 이전/다음 버튼으로 레벨별 랭킹 탐색
+- 📱 반응형 디자인으로 모바일에서도 플레이 가 -->
+
 
 <!DOCTYPE html>
 <html lang="ko">
@@ -27,7 +28,7 @@
       background-color: #f0f0f0;
     }
 
-    #startBtn, #rankingBtn {
+    #startBtn, #rankingBtn, #prevLevel, #nextLevel {
       padding: 10px 20px;
       font-size: 16px;
       margin: 5px;
@@ -39,32 +40,13 @@
     }
 
     .hidden {
-        display: none !important;
-      }
-
-    /* .holes {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
-      gap: 5px;
-      padding: 10px;
-      width: 100vw;
-      height: calc(100vh - 180px);
-      box-sizing: border-box;
+      display: none !important;
     }
-
-    .hole {
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      background-color: #ccc;
-      position: relative;
-      border-radius: 50%;
-      overflow: hidden;
-    } */
 
     .holes {
       position: relative;
       width: 100vw;
-      height: calc(100vh - 20px); /* header 숨김 기준으로 조정 */
+      height: calc(100vh - 20px);
       overflow: hidden;
     }
 
@@ -112,12 +94,14 @@
       z-index: 1000;
     }
 
-    #rankingDisplay h3 {
+    #rankingTitle {
       margin-top: 0;
+      font-size: 20px;
     }
 
     #rankingContent {
       text-align: left;
+      margin-bottom: 10px;
     }
 
     #overlay {
@@ -133,7 +117,7 @@
   </style>
 </head>
 <body>
-  <header>
+  <header id="gameHeader">
     <h1>두더지 잡기!</h1>
     <p id="instruction">🎮 시작을 누르고 난이도를 선택하세요</p>
     <label for="levelSelect">난이도 선택:</label>
@@ -156,15 +140,16 @@
 
   <div id="overlay"></div>
   <div id="rankingDisplay">
-    <h3>레벨별 상위 10명 랭킹</h3>
+    <h3 id="rankingTitle">레벨 1 랭킹</h3>
     <div id="rankingContent"></div>
+    <button id="prevLevel">이전</button>
+    <button id="nextLevel">다음</button>
     <button onclick="closeRanking()">닫기</button>
   </div>
 
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-    import { getDatabase, ref, push, query, orderByChild, limitToLast, get } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
+    import { getDatabase, ref, push, get } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDKTxGuQYjZlKiteYhbwApwcYKpXeGufoc",
@@ -177,11 +162,12 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    const db = getDatabase(app, "https://molegame-e285f-default-rtdb.asia-southeast1.firebasedatabase.app");
 
     let score = 0;
     let timeLeft = 30;
     let level = 1;
+    let currentRankingLevel = 1;
     let gameInterval;
     let timerInterval;
 
@@ -190,23 +176,15 @@
     const levelDisplay = document.getElementById('levelDisplay');
     const countdownDisplay = document.getElementById('countdown');
     const holesContainer = document.getElementById('holesContainer');
-
-    const header = document.querySelector('header');
-
-    function startGame() {
-      header.classList.add('hidden'); // 게임 시작 시 숨김
-      // 기존 startGame 코드 유지
-    }
-
-    function endGame() {
-      header.classList.remove('hidden'); // 게임 종료 시 다시 보임
-      // 기존 endGame 코드 유지
-    }
+    const header = document.getElementById('gameHeader');
 
     document.getElementById('startBtn').addEventListener('click', () => {
       level = parseInt(document.getElementById('levelSelect').value);
       levelDisplay.textContent = `레벨: ${level}`;
-      startCountdown(startGame);
+      startCountdown(() => {
+        header.classList.add('hidden');
+        startGame();
+      });
     });
 
     function startCountdown(callback) {
@@ -223,21 +201,36 @@
       }, 1000);
     }
 
+    function isOverlapping(x, y, existing, size = 60) {
+      for (const pos of existing) {
+        const dx = pos.x - x;
+        const dy = pos.y - y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < size) return true;
+      }
+      return false;
+    }
+
     function createHoles(count) {
       holesContainer.innerHTML = '';
       const containerWidth = holesContainer.offsetWidth;
       const containerHeight = holesContainer.offsetHeight;
+      const placed = [];
 
       for (let i = 0; i < count; i++) {
+        let x, y, attempts = 0;
+        do {
+          x = Math.random() * (containerWidth - 60);
+          y = Math.random() * (containerHeight - 60);
+          attempts++;
+        } while (isOverlapping(x, y, placed) && attempts < 100);
+
+        placed.push({ x, y });
+
         const hole = document.createElement('div');
         hole.classList.add('hole');
-
-        const x = Math.random() * (containerWidth - 60);
-        const y = Math.random() * (containerHeight - 60);
-
         hole.style.left = `${x}px`;
         hole.style.top = `${y}px`;
-
         holesContainer.appendChild(hole);
       }
     }
@@ -278,7 +271,7 @@
       scoreDisplay.textContent = score;
       timeDisplay.textContent = timeLeft;
 
-      const holeCounts = { 1: 7, 2: 15, 3: 25, 4: 30, 5: 40 };
+            const holeCounts = { 1: 7, 2: 15, 3: 25, 4: 30, 5: 40 };
       createHoles(holeCounts[level]);
 
       gameInterval = setInterval(showMoles, 800);
@@ -294,56 +287,88 @@
     }
 
     function endGame() {
+      clearInterval(gameInterval);
+      clearInterval(timerInterval);
       alert(`게임 종료! 당신의 점수는 ${score}점입니다.`);
       const nickname = prompt("닉네임을 입력하세요:");
       if (nickname) {
-                const scoresRef = ref(db, `rankings/level${level}`);
-        push(scoresRef, { name: nickname, score });
+        const scoresRef = ref(db, `rankings/level${level}`);
+        push(scoresRef, { name: nickname, score: Number(score) })
+          .then(() => console.log("✅ 점수 저장 완료"))
+          .catch(err => console.error("❌ 점수 저장 실패:", err));
       }
+
+      header.classList.remove('hidden');
 
       if (level < 5) {
         const next = confirm("다음 레벨로 진행하시겠습니까?");
         if (next) {
           level++;
           levelDisplay.textContent = `레벨: ${level}`;
-          startCountdown(startGame);
-          return;
+          startCountdown(() => {
+            header.classList.add('hidden');
+            startGame();
+          });
         }
       }
     }
 
-    // 🔍 랭킹 불러오기 및 표시
-    document.getElementById('rankingBtn').addEventListener('click', async () => {
-      const selectedLevel = parseInt(document.getElementById('levelSelect').value);
-      const scoresRef = query(ref(db, `rankings/level${selectedLevel}`), orderByChild('score'), limitToLast(10));
+    async function loadRanking(level) {
+      const scoresRef = ref(db, `rankings/level${level}`);
+      const rankingContent = document.getElementById('rankingContent');
+      const rankingTitle = document.getElementById('rankingTitle');
+
+      rankingTitle.textContent = `레벨 ${level} 랭킹`;
+      rankingContent.innerHTML = '';
 
       try {
         const snapshot = await get(scoresRef);
-        const data = [];
-        snapshot.forEach(child => {
-          data.push(child.val());
-        });
-        data.reverse(); // 높은 점수 순
-
-        const rankingContent = document.getElementById('rankingContent');
-        rankingContent.innerHTML = '';
-        if (data.length === 0) {
-          rankingContent.innerHTML = '<p>기록 없음</p>';
-        } else {
-          data.forEach((entry, idx) => {
-            rankingContent.innerHTML += `<p>${idx + 1}. ${entry.name} - ${entry.score}점</p>`;
-          });
+        if (!snapshot.exists()) {
+          rankingContent.innerHTML = '<p>아직 달성자가 없습니다.</p>';
+          return;
         }
 
-        document.getElementById('overlay').style.display = 'block';
-        document.getElementById('rankingDisplay').style.display = 'block';
+        const data = [];
+        snapshot.forEach(child => {
+          const val = child.val();
+          if (val && typeof val.score === 'number') {
+            data.push(val);
+          }
+        });
+
+        data.sort((a, b) => b.score - a.score);
+        const top10 = data.slice(0, 10);
+
+        top10.forEach((entry, idx) => {
+          rankingContent.innerHTML += `<p>${idx + 1}. ${entry.name} - ${entry.score}점</p>`;
+        });
       } catch (error) {
-        console.error("랭킹 불러오기 실패:", error);
-        alert("랭킹 데이터를 불러오는 데 문제가 발생했습니다.");
+        console.error("❌ 랭킹 불러오기 실패:", error);
+        rankingContent.innerHTML = '<p>랭킹 데이터를 불러오는 데 문제가 발생했습니다.</p>';
+      }
+    }
+
+    document.getElementById('rankingBtn').addEventListener('click', () => {
+      currentRankingLevel = parseInt(document.getElementById('levelSelect').value);
+      loadRanking(currentRankingLevel);
+      document.getElementById('overlay').style.display = 'block';
+      document.getElementById('rankingDisplay').style.display = 'block';
+    });
+
+    document.getElementById('prevLevel').addEventListener('click', () => {
+      if (currentRankingLevel > 1) {
+        currentRankingLevel--;
+        loadRanking(currentRankingLevel);
       }
     });
 
-    // 🔙 랭킹 닫기
+    document.getElementById('nextLevel').addEventListener('click', () => {
+      if (currentRankingLevel < 5) {
+        currentRankingLevel++;
+        loadRanking(currentRankingLevel);
+      }
+    });
+
     window.closeRanking = function () {
       document.getElementById('overlay').style.display = 'none';
       document.getElementById('rankingDisplay').style.display = 'none';
