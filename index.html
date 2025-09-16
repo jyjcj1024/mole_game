@@ -8,25 +8,36 @@
     body {
       font-family: sans-serif;
       text-align: center;
-      margin-top: 30px;
+      margin: 20px;
     }
+
+    #startBtn {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+
     .holes {
       display: grid;
-      grid-template-columns: repeat(4, 100px);
-      grid-gap: 20px;
-      justify-content: center;
-      margin-top: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap: 10px;
+      padding: 10px;
+      max-width: 600px;
+      margin: 0 auto;
     }
+
     .hole {
-      width: 100px;
-      height: 100px;
+      width: 100%;
+      aspect-ratio: 1 / 1;
       background-color: #ccc;
       position: relative;
       border-radius: 50%;
+      overflow: hidden;
     }
+
     .mole {
-      width: 100px;
-      height: 100px;
+      width: 100%;
+      height: 100%;
       background-image: url('mole.png');
       background-size: cover;
       background-repeat: no-repeat;
@@ -38,10 +49,12 @@
       cursor: pointer;
       pointer-events: auto;
     }
-    #startBtn {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin-bottom: 20px;
+
+    @media (max-width: 400px) {
+      #startBtn {
+        font-size: 14px;
+        padding: 8px 16px;
+      }
     }
   </style>
 </head>
@@ -50,6 +63,7 @@
   <button id="startBtn">게임 시작</button>
   <p>점수: <span id="score">0</span></p>
   <p>남은 시간: <span id="time">30</span>초</p>
+
   <div class="holes" id="holesContainer">
     <div class="hole" id="hole1"></div>
     <div class="hole" id="hole2"></div>
@@ -81,7 +95,7 @@
       mole.classList.add('mole');
 
       function hitMole(e) {
-        e.preventDefault(); // 모바일 중복 방지
+        e.preventDefault();
         score++;
         scoreDisplay.textContent = score;
         mole.remove();
@@ -94,7 +108,7 @@
 
       setTimeout(() => {
         mole.remove();
-      }, 1500); // 두더지 지속 시간 늘림
+      }, 1500);
     }
 
     function startGame() {
