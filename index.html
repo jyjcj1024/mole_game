@@ -1,13 +1,3 @@
-<!-- 
-✅ 포함된 기능
-- 🔢 난이도 선택 및 레벨별 구멍/두더지 수 자동 조절
-- 🕹️ 게임 시작 시 카운트다운 + UI 숨김
-- 🧑‍💻 닉네임 입력 후 Firebase에 점수 저장
-- 📊 랭킹 확인 시 레벨별 상위 10명 표시
-- ⏪⏩ 이전/다음 버튼으로 레벨별 랭킹 탐색
-- 📱 반응형 디자인으로 모바일에서도 플레이 가 -->
-
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -21,14 +11,19 @@
       margin: 0;
       padding: 0;
       overflow: hidden;
+      /* 배경 이미지 설정 */
+      background-image: url('grass.png');
+      background-size: cover;
+      background-position: center;
     }
 
     header {
       padding: 10px;
-      background-color: #f0f0f0;
+      background-color: rgba(240, 240, 240, 0.8); /* 배경이 비치도록 반투명 처리 */
+      border-radius: 0 0 15px 15px;
     }
 
-    #startBtn, #rankingBtn, #prevLevel, #nextLevel {
+    #startBtn, #rankingBtn, #changeNicknameBtn, #prevLevel, #nextLevel {
       padding: 10px 20px;
       font-size: 16px;
       margin: 5px;
@@ -46,36 +41,57 @@
     .holes {
       position: relative;
       width: 100vw;
-      height: calc(100vh - 20px);
+      height: calc(100vh - 170px); /* 헤더 높이를 고려하여 조정 */
       overflow: hidden;
     }
 
     .hole {
       position: absolute;
-      width: 60px;
-      height: 60px;
-      background-color: #ccc;
+      /* 구멍 이미지 설정 */
+      background-image: url('hole.png');
+      background-size: contain; /* 이미지가 잘리지 않도록 contain으로 변경 */
+      background-position: center;
+      background-repeat: no-repeat;
+      background-color: transparent; /* 중요: 배경색 투명 처리 */
       border-radius: 50%;
+
+      /* ✅ [수정] 자식 요소의 위치 기준점으로 설정 */
+      position: relative; 
+
+    }
+    
+    /* 두더지와 방해 캐릭터의 공통 스타일 */
+    .mole, .decoy {
+        /* ✅ [추가] 부모 요소를 기준으로 절대 위치 설정 */
+        position: absolute;
+        bottom: 40%; /* ✨ 핵심: 캐릭터의 밑단을 구멍의 세로 중앙에 맞춤 */
+        left: 50%;
+        transform: translateX(-50%); /* 가로 중앙 정렬 */
+
+        /* 크기는 구멍보다 약간 작게 유지 */
+        width: 80%;
+        height: 80%;
+        
+        /* 나머지 스타일은 그대로 유지 */
+        background-size: 80%;
+        background-position: center bottom;
+        background-repeat: no-repeat;
+        border-radius: 50%;
+        cursor: pointer;
+        pointer-events: auto;
+        transition: top 0.2s;
     }
 
+    /* 두더지 전용 이미지 */
     .mole {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-image: url('mole.png');
-      background-size: cover;
-      background-repeat: no-repeat;
-      background-position: center;
-      border-radius: 50%;
-      cursor: pointer;
-      pointer-events: auto;
+       background-image: url('mole.png');
     }
 
     #countdown {
       font-size: 36px;
       font-weight: bold;
+      color: white;
+      text-shadow: 2px 2px 4px black;
       margin-top: 10px;
     }
 
@@ -131,6 +147,8 @@
     <div id="levelDisplay">레벨: 1</div>
     <button id="startBtn">게임 시작</button>
     <button id="rankingBtn">랭킹 확인</button>
+    <button id="changeNicknameBtn">닉네임 변경</button>
+    <p id="nicknameDisplay">플레이어: 없음</p>
     <p>점수: <span id="score">0</span></p>
     <p>남은 시간: <span id="time">30</span>초</p>
     <div id="countdown"></div>
@@ -164,12 +182,20 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app, "https://molegame-e285f-default-rtdb.asia-southeast1.firebasedatabase.app");
 
+    // 방해 캐릭터 이미지 리스트
+    const decoyImages = [
+        'decoy1.png', // 여기에 준비한 이미지 파일 이름을 넣으세요.
+        'decoy2.png',
+        'decoy3.png'
+    ];
+
     let score = 0;
     let timeLeft = 30;
     let level = 1;
     let currentRankingLevel = 1;
     let gameInterval;
     let timerInterval;
+    let currentUserNickname = null;
 
     const scoreDisplay = document.getElementById('score');
     const timeDisplay = document.getElementById('time');
@@ -177,14 +203,33 @@
     const countdownDisplay = document.getElementById('countdown');
     const holesContainer = document.getElementById('holesContainer');
     const header = document.getElementById('gameHeader');
+    const nicknameDisplay = document.getElementById('nicknameDisplay');
 
     document.getElementById('startBtn').addEventListener('click', () => {
+      if (!currentUserNickname) {
+        currentUserNickname = prompt("게임에서 사용할 닉네임을 입력하세요:");
+        if (!currentUserNickname) {
+          alert("닉네임이 입력되지 않아 게임을 시작할 수 없습니다.");
+          return;
+        }
+        nicknameDisplay.textContent = `플레이어: ${currentUserNickname}`;
+      }
+      
       level = parseInt(document.getElementById('levelSelect').value);
       levelDisplay.textContent = `레벨: ${level}`;
       startCountdown(() => {
         header.classList.add('hidden');
         startGame();
       });
+    });
+    
+    document.getElementById('changeNicknameBtn').addEventListener('click', () => {
+        const newNickname = prompt("새로운 닉네임을 입력하세요:", currentUserNickname || "");
+        if (newNickname) {
+            currentUserNickname = newNickname;
+            nicknameDisplay.textContent = `플레이어: ${currentUserNickname}`;
+            alert(`닉네임이 '${currentUserNickname}'(으)로 변경되었습니다.`);
+        }
     });
 
     function startCountdown(callback) {
@@ -201,7 +246,7 @@
       }, 1000);
     }
 
-    function isOverlapping(x, y, existing, size = 60) {
+    function isOverlapping(x, y, existing, size) {
       for (const pos of existing) {
         const dx = pos.x - x;
         const dy = pos.y - y;
@@ -215,20 +260,32 @@
       holesContainer.innerHTML = '';
       const containerWidth = holesContainer.offsetWidth;
       const containerHeight = holesContainer.offsetHeight;
+      const targetTotalHoleArea = (containerWidth * containerHeight) * 0.25;
+      const singleHoleArea = targetTotalHoleArea / count;
+      let holeSize = Math.sqrt(singleHoleArea);
+      holeSize = Math.max(40, Math.min(holeSize, 80)); 
       const placed = [];
+      const margin = holeSize * 0.1;
 
       for (let i = 0; i < count; i++) {
         let x, y, attempts = 0;
         do {
-          x = Math.random() * (containerWidth - 60);
-          y = Math.random() * (containerHeight - 60);
+          x = Math.random() * (containerWidth - holeSize);
+          y = Math.random() * (containerHeight - holeSize);
           attempts++;
-        } while (isOverlapping(x, y, placed) && attempts < 100);
+        } while (isOverlapping(x, y, placed, holeSize + margin) && attempts < 100);
+
+        if (attempts >= 100) {
+             console.warn("겹치지 않는 위치를 찾지 못했습니다.");
+             continue;
+        }
 
         placed.push({ x, y });
 
         const hole = document.createElement('div');
         hole.classList.add('hole');
+        hole.style.width = `${holeSize}px`;
+        hole.style.height = `${holeSize}px`;
         hole.style.left = `${x}px`;
         hole.style.top = `${y}px`;
         holesContainer.appendChild(hole);
@@ -237,32 +294,66 @@
 
     function randomHole() {
       const holes = document.querySelectorAll('.hole');
+      if (holes.length === 0) return null;
       const index = Math.floor(Math.random() * holes.length);
       return holes[index];
     }
 
-    function showMoles() {
+    function showCharacters() {
       const maxMoles = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 5 }[level];
       const moleCount = Math.floor(Math.random() * maxMoles) + 1;
 
-      for (let i = 0; i < moleCount; i++) {
-        const hole = randomHole();
+      let decoyCount = 0;
+      if (level <= 2) {
+          if (Math.random() < 0.4) decoyCount = 1;
+      } else {
+          const rand = Math.random();
+          if (rand < 0.3) decoyCount = 1;
+          else if (rand < 0.6) decoyCount = 2;
+      }
+
+      const allHoles = Array.from(document.querySelectorAll('.hole'));
+      const availableHoles = allHoles.filter(hole => !hole.hasChildNodes());
+      availableHoles.sort(() => 0.5 - Math.random());
+
+      for (let i = 0; i < Math.min(moleCount, availableHoles.length); i++) {
+        const hole = availableHoles.pop();
         const mole = document.createElement('div');
         mole.classList.add('mole');
-
         mole.addEventListener('click', hitMole);
         mole.addEventListener('touchstart', hitMole, { passive: false });
-
-        function hitMole(e) {
-          e.preventDefault();
-          score++;
-          scoreDisplay.textContent = score;
-          mole.remove();
-        }
-
         hole.appendChild(mole);
         setTimeout(() => mole.remove(), 1500);
       }
+
+      for (let i = 0; i < Math.min(decoyCount, availableHoles.length); i++) {
+        const hole = availableHoles.pop();
+        const decoy = document.createElement('div');
+        decoy.classList.add('decoy');
+        const randomDecoyImg = decoyImages[Math.floor(Math.random() * decoyImages.length)];
+        decoy.style.backgroundImage = `url('${randomDecoyImg}')`;
+        decoy.addEventListener('click', hitDecoy);
+        decoy.addEventListener('touchstart', hitDecoy, { passive: false });
+        hole.appendChild(decoy);
+        setTimeout(() => decoy.remove(), 1800);
+      }
+    }
+
+    function hitMole(e) {
+      e.preventDefault();
+      score++;
+      scoreDisplay.textContent = score;
+      this.remove();
+    }
+
+    function hitDecoy(e) {
+      e.preventDefault();
+      const penalty = document.querySelectorAll('.decoy').length;
+      score -= penalty;
+      scoreDisplay.textContent = score;
+      scoreDisplay.style.color = 'red';
+      setTimeout(() => { scoreDisplay.style.color = 'black'; }, 500);
+      this.remove();
     }
 
     function startGame() {
@@ -270,17 +361,15 @@
       timeLeft = 30;
       scoreDisplay.textContent = score;
       timeDisplay.textContent = timeLeft;
-
-            const holeCounts = { 1: 7, 2: 15, 3: 25, 4: 30, 5: 40 };
+      const holeCounts = { 1: 7, 2: 15, 3: 25, 4: 30, 5: 40 };
       createHoles(holeCounts[level]);
-
-      gameInterval = setInterval(showMoles, 800);
+      
+      gameInterval = setInterval(showCharacters, 800);
+      
       timerInterval = setInterval(() => {
         timeLeft--;
         timeDisplay.textContent = timeLeft;
         if (timeLeft <= 0) {
-          clearInterval(gameInterval);
-          clearInterval(timerInterval);
           endGame();
         }
       }, 1000);
@@ -289,13 +378,18 @@
     function endGame() {
       clearInterval(gameInterval);
       clearInterval(timerInterval);
+      
+      document.querySelectorAll('.mole, .decoy').forEach(char => char.remove());
+
       alert(`게임 종료! 당신의 점수는 ${score}점입니다.`);
-      const nickname = prompt("닉네임을 입력하세요:");
-      if (nickname) {
+      
+      if (currentUserNickname) {
         const scoresRef = ref(db, `rankings/level${level}`);
-        push(scoresRef, { name: nickname, score: Number(score) })
+        push(scoresRef, { name: currentUserNickname, score: Number(score) })
           .then(() => console.log("✅ 점수 저장 완료"))
           .catch(err => console.error("❌ 점수 저장 실패:", err));
+      } else {
+        console.warn("닉네임이 없어 점수를 저장하지 않았습니다.");
       }
 
       header.classList.remove('hidden');
@@ -304,6 +398,7 @@
         const next = confirm("다음 레벨로 진행하시겠습니까?");
         if (next) {
           level++;
+          document.getElementById('levelSelect').value = level;
           levelDisplay.textContent = `레벨: ${level}`;
           startCountdown(() => {
             header.classList.add('hidden');
@@ -312,14 +407,14 @@
         }
       }
     }
-
+    
     async function loadRanking(level) {
       const scoresRef = ref(db, `rankings/level${level}`);
       const rankingContent = document.getElementById('rankingContent');
       const rankingTitle = document.getElementById('rankingTitle');
 
       rankingTitle.textContent = `레벨 ${level} 랭킹`;
-      rankingContent.innerHTML = '';
+      rankingContent.innerHTML = '불러오는 중...';
 
       try {
         const snapshot = await get(scoresRef);
@@ -335,7 +430,8 @@
             data.push(val);
           }
         });
-
+        
+        rankingContent.innerHTML = '';
         data.sort((a, b) => b.score - a.score);
         const top10 = data.slice(0, 10);
 
