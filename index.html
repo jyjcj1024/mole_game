@@ -233,7 +233,6 @@
 
 
   <script type="module">
-    // ✅ [수정] Firebase SDK에서 필요한 함수들을 모두 import 합니다.
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
     import { getDatabase, ref, push, get, query, orderByChild, equalTo, update } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
 
@@ -448,7 +447,6 @@
       }, 1000);
     }
 
-    // ✅ [수정] endGame 함수를 async (비동기) 함수로 변경
     async function endGame() {
       clearInterval(gameInterval);
       clearInterval(timerInterval);
@@ -463,14 +461,12 @@
 
       if (currentUserNickname) {
         const scoresRef = ref(db, `rankings/level${level}`);
-        // 닉네임으로 기존 기록을 찾는 쿼리 생성
         const userQuery = query(scoresRef, orderByChild('name'), equalTo(currentUserNickname));
 
         try {
             const snapshot = await get(userQuery);
 
             if (snapshot.exists()) {
-                // 기존 기록이 있을 경우
                 let existingKey = null;
                 let existingScore = -1;
                 snapshot.forEach((childSnapshot) => {
@@ -479,7 +475,6 @@
                 });
 
                 if (finalScore > existingScore) {
-                    // 새 점수가 더 높을 때만 업데이트
                     console.log(`✅ 최고 기록 갱신! ${existingScore} -> ${finalScore}`);
                     const updates = {};
                     updates[`/rankings/level${level}/${existingKey}/score`] = finalScore;
@@ -488,33 +483,39 @@
                     console.log(`❕ 점수(${finalScore})가 기존 기록(${existingScore})보다 낮아 업데이트하지 않음`);
                 }
             } else {
-                // 기존 기록이 없을 경우, 새로 추가
                 console.log("✅ 첫 기록! 점수를 저장합니다.");
                 await push(scoresRef, { name: currentUserNickname, score: finalScore });
             }
         } catch (err) {
             console.error("❌ 점수 저장/업데이트 실패:", err);
+            alert(`랭킹 저장 중 오류가 발생했습니다. Firebase 데이터베이스의 '규칙' 설정을 확인해주세요.\n\n오류: ${err.message}`);
         }
-
       } else {
         console.warn("닉네임이 없어 점수를 저장하지 않았습니다.");
       }
 
       header.classList.remove('hidden');
 
-      if (level < 5) {
-        const next = confirm("다음 레벨로 진행하시겠습니까?");
-        if (next) {
-          level++;
-          document.getElementById('levelSelect').value = level;
-          levelDisplay.textContent = `레벨: ${level}`;
-          startCountdown(() => {
-            header.classList.add('hidden');
-            startGame();
-          });
-        }
-      }
+      // ✅ [수정] 다음 레벨 질문 로직은 결과창이 닫힌 후에 호출되도록 이동
+      // 이 부분은 closeModal 함수에서 처리합니다.
     }
+
+    // ✅ [추가] 다음 레벨 진행 여부를 묻는 별도의 함수
+    function askForNextLevel() {
+        if (level < 5) {
+            const next = confirm("다음 레벨로 진행하시겠습니까?");
+            if (next) {
+                level++;
+                document.getElementById('levelSelect').value = level;
+                levelDisplay.textContent = `레벨: ${level}`;
+                startCountdown(() => {
+                    header.classList.add('hidden');
+                    startGame();
+                });
+            }
+        }
+    }
+
 
     function showResultModal(finalScore) {
         const molesMissed = totalMolesAppeared - molesHit;
@@ -602,10 +603,16 @@
         loadRanking(currentRankingLevel);
       }
     });
-
+    
+    // ✅ [수정] closeModal 함수가 다음 레벨 질문을 호출하도록 변경
     window.closeModal = function (modalId) {
       document.getElementById('overlay').style.display = 'none';
       document.getElementById(modalId).style.display = 'none';
+
+      // 만약 닫힌 모달이 결과창이라면, 다음 레벨 진행 여부를 묻습니다.
+      if (modalId === 'resultDisplay') {
+          askForNextLevel();
+      }
     };
 
   </script>
