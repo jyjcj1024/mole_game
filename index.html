@@ -233,8 +233,9 @@
 
 
   <script type="module">
+    // ✅ [수정] Firebase SDK에서 필요한 함수들을 모두 import 합니다.
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-    import { getDatabase, ref, push, get } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
+    import { getDatabase, ref, push, get, query, orderByChild, equalTo, update } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDKTxGuQYjZlKiteYhbwApwcYKpXeGufoc",
@@ -251,8 +252,7 @@
 
     const decoyImages = ['decoy1.png', 'decoy2.png', 'decoy3.png'];
 
-    // ✅ [수정] 점수 및 통계 변수
-    let score = 0; // 기존 점수는 실시간 표시용
+    let score = 0;
     let molesHit = 0;
     let decoysHit = 0;
     let totalMolesAppeared = 0;
@@ -380,7 +380,7 @@
         mole.addEventListener('click', hitMole);
         mole.addEventListener('touchstart', hitMole, { passive: false });
         hole.appendChild(mole);
-        totalMolesAppeared++; // ✅ 두더지 나타날 때마다 카운트
+        totalMolesAppeared++;
         setTimeout(() => mole.remove(), 1500);
       }
 
@@ -400,15 +400,15 @@
     function hitMole(e) {
       e.preventDefault();
       score++;
-      molesHit++; // ✅ 잡은 두더지 수 카운트
+      molesHit++;
       scoreDisplay.textContent = score;
       this.remove();
     }
 
     function hitDecoy(e) {
       e.preventDefault();
-      score--; // ✅ 감점은 -1로 통일
-      decoysHit++; // ✅ 잘못 누른 횟수 카운트
+      score--;
+      decoysHit++;
       scoreDisplay.textContent = score;
       
       document.body.classList.add('shake');
@@ -426,7 +426,6 @@
     }
 
     function startGame() {
-      // ✅ [수정] 통계 변수 초기화
       score = 0;
       molesHit = 0;
       decoysHit = 0;
@@ -449,25 +448,54 @@
       }, 1000);
     }
 
-    function endGame() {
+    // ✅ [수정] endGame 함수를 async (비동기) 함수로 변경
+    async function endGame() {
       clearInterval(gameInterval);
       clearInterval(timerInterval);
       document.querySelectorAll('.mole, .decoy').forEach(char => char.remove());
 
-      // ✅ [수정] 표준 점수 계산 로직
       const baseScore = totalMolesAppeared > 0 ? (molesHit / totalMolesAppeared) * 100 : 0;
       const penalty = decoysHit * 5;
       let finalScore = Math.round(baseScore - penalty);
-      finalScore = Math.max(0, finalScore); // 점수가 0점 밑으로 내려가지 않게
+      finalScore = Math.max(0, finalScore);
 
-      showResultModal(finalScore); // 결과 분석창 표시
+      showResultModal(finalScore);
 
       if (currentUserNickname) {
         const scoresRef = ref(db, `rankings/level${level}`);
-        // Firebase에는 표준 점수를 저장
-        push(scoresRef, { name: currentUserNickname, score: finalScore })
-          .then(() => console.log("✅ 점수 저장 완료"))
-          .catch(err => console.error("❌ 점수 저장 실패:", err));
+        // 닉네임으로 기존 기록을 찾는 쿼리 생성
+        const userQuery = query(scoresRef, orderByChild('name'), equalTo(currentUserNickname));
+
+        try {
+            const snapshot = await get(userQuery);
+
+            if (snapshot.exists()) {
+                // 기존 기록이 있을 경우
+                let existingKey = null;
+                let existingScore = -1;
+                snapshot.forEach((childSnapshot) => {
+                    existingKey = childSnapshot.key;
+                    existingScore = childSnapshot.val().score;
+                });
+
+                if (finalScore > existingScore) {
+                    // 새 점수가 더 높을 때만 업데이트
+                    console.log(`✅ 최고 기록 갱신! ${existingScore} -> ${finalScore}`);
+                    const updates = {};
+                    updates[`/rankings/level${level}/${existingKey}/score`] = finalScore;
+                    await update(ref(db), updates);
+                } else {
+                    console.log(`❕ 점수(${finalScore})가 기존 기록(${existingScore})보다 낮아 업데이트하지 않음`);
+                }
+            } else {
+                // 기존 기록이 없을 경우, 새로 추가
+                console.log("✅ 첫 기록! 점수를 저장합니다.");
+                await push(scoresRef, { name: currentUserNickname, score: finalScore });
+            }
+        } catch (err) {
+            console.error("❌ 점수 저장/업데이트 실패:", err);
+        }
+
       } else {
         console.warn("닉네임이 없어 점수를 저장하지 않았습니다.");
       }
@@ -488,7 +516,6 @@
       }
     }
 
-    // ✅ [추가] 결과 분석창을 보여주는 함수
     function showResultModal(finalScore) {
         const molesMissed = totalMolesAppeared - molesHit;
         const totalClicks = molesHit + decoysHit;
@@ -576,7 +603,6 @@
       }
     });
 
-    // ✅ [수정] 모든 모달을 닫는 범용 함수
     window.closeModal = function (modalId) {
       document.getElementById('overlay').style.display = 'none';
       document.getElementById(modalId).style.display = 'none';
@@ -585,4 +611,3 @@
   </script>
 </body>
 </html>
-
