@@ -89,9 +89,9 @@
     
     .penalty-display {
         position: absolute;
-        font-size: 24px;
+        font-size: 30px;
         font-weight: bold;
-        color: red;
+        color: rgb(255, 238, 0);
         text-shadow: 1px 1px 2px white;
         pointer-events: none;
         animation: floatUp 1s ease-out forwards;
@@ -423,7 +423,7 @@
     function hitDecoy(e) {
       e.preventDefault();
       playSound(missSound); // ✅ [수정] 실수 효과음 재생
-      score--;
+      score -= 5;
       decoysHit++;
       scoreDisplay.textContent = score;
       
@@ -431,7 +431,7 @@
       setTimeout(() => document.body.classList.remove('shake'), 200);
 
       const penaltyText = document.createElement('div');
-      penaltyText.textContent = `-1`;
+      penaltyText.textContent = `-5`;
       penaltyText.classList.add('penalty-display');
       penaltyText.style.left = `${e.clientX}px`;
       penaltyText.style.top = `${e.clientY - 30}px`;
