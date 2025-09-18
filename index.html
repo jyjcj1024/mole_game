@@ -162,10 +162,6 @@
   </style>
 </head>
 <body>
-  <!-- <audio id="bgm" src="bgm.mp3" loop></audio>
-  <audio id="hitSound" src="hit.mp3"></audio>
-  <audio id="missSound" src="miss.mp3"></audio> -->
-
   <header id="gameHeader">
     <h1>두더지 잡기!</h1>
     <p id="instruction">🎮 시작을 누르고 난이도를 선택하세요</p>
@@ -264,10 +260,10 @@
     let timerInterval;
     let currentUserNickname = null;
 
-    // ✅ [추가] 오디오 요소 가져오기
-    const bgm = document.getElementById('bgm');
-    const hitSound = document.getElementById('hitSound');
-    const missSound = document.getElementById('missSound');
+    // ❌ [수정] 오디오 요소가 HTML에서 주석 처리되어 있으므로, 관련 스크립트도 주석 처리합니다.
+    // const bgm = document.getElementById('bgm');
+    // const hitSound = document.getElementById('hitSound');
+    // const missSound = document.getElementById('missSound');
 
     const scoreDisplay = document.getElementById('score');
     const timeDisplay = document.getElementById('time');
@@ -277,15 +273,17 @@
     const header = document.getElementById('gameHeader');
     const nicknameDisplay = document.getElementById('nicknameDisplay');
     
-    // ✅ [추가] 오디오 재생을 위한 함수
-    function playSound(sound) {
-        sound.currentTime = 0; // 재생 위치를 처음으로 되돌림
-        sound.play();
-    }
+    // ❌ [수정] 오디오 재생 함수도 주석 처리합니다.
+    // function playSound(sound) {
+    //     if (sound) {
+    //       sound.currentTime = 0; 
+    //       sound.play();
+    //     }
+    // }
 
     document.getElementById('startBtn').addEventListener('click', () => {
-      // ✅ [추가] 게임 시작 시 배경음악 재생
-      bgm.play().catch(e => console.log("사용자 상호작용이 필요하여 BGM 자동 재생에 실패했습니다."));
+      // ❌ [수정] 배경음악 재생 코드 주석 처리
+      // if(bgm) bgm.play().catch(e => console.log("사용자 상호작용이 필요하여 BGM 자동 재생에 실패했습니다."));
 
       if (!currentUserNickname) {
         currentUserNickname = prompt("게임에서 사용할 닉네임을 입력하세요:");
@@ -413,7 +411,7 @@
 
     function hitMole(e) {
       e.preventDefault();
-      playSound(hitSound); // ✅ [수정] 타격음 재생
+      // playSound(hitSound); // ❌ [수정] 타격음 재생 주석 처리
       score++;
       molesHit++;
       scoreDisplay.textContent = score;
@@ -422,7 +420,7 @@
 
     function hitDecoy(e) {
       e.preventDefault();
-      playSound(missSound); // ✅ [수정] 실수 효과음 재생
+      // playSound(missSound); // ❌ [수정] 실수 효과음 재생 주석 처리
       score -= 5;
       decoysHit++;
       scoreDisplay.textContent = score;
