@@ -91,8 +91,8 @@
         position: absolute;
         font-size: 30px;
         font-weight: bold;
-        color: rgb(255, 255, 255);
-        text-shadow: 1px 1px 2px rgb(222, 222, 222);
+        color: rgb(255, 238, 0);
+        text-shadow: 1px 1px 2px white;
         pointer-events: none;
         animation: floatUp 1s ease-out forwards;
     }
@@ -179,7 +179,7 @@
     <button id="helpBtn">게임 설명</button>
     <button id="changeNicknameBtn">닉네임 변경</button>
     <p id="nicknameDisplay">플레이어: 없음</p>
-    <p>점수: <span id="score">0</span></p>
+    <p id="scoreContainer">점수: <span id="score">0</span></p>
     <p>남은 시간: <span id="time">30</span>초</p>
     <div id="countdown"></div>
   </header>
@@ -248,6 +248,13 @@
 
     const decoyImages = ['decoy1.png', 'decoy2.png', 'decoy3.png'];
 
+    // ✅ [추가] 오디오 파일 리스트 (준비되면 파일명 추가)
+    /*
+    const bgmList = ['bgm1.mp3', 'bgm2.mp3'];
+    const hitSoundList = ['hit1.mp3', 'hit2.mp3'];
+    const missSoundList = ['miss1.mp3', 'miss2.mp3'];
+    */
+
     let score = 0;
     let molesHit = 0;
     let decoysHit = 0;
@@ -260,30 +267,38 @@
     let timerInterval;
     let currentUserNickname = null;
 
-    // ❌ [수정] 오디오 요소가 HTML에서 주석 처리되어 있으므로, 관련 스크립트도 주석 처리합니다.
-    // const bgm = document.getElementById('bgm');
-    // const hitSound = document.getElementById('hitSound');
-    // const missSound = document.getElementById('missSound');
+    // ✅ [추가] 오디오 HTML 요소 가져오기 (주석 처리)
+    /*
+    const bgmAudio = document.getElementById('bgmAudio');
+    const sfxAudio = document.getElementById('sfxAudio');
+    */
 
-    const scoreDisplay = document.getElementById('score');
     const timeDisplay = document.getElementById('time');
     const levelDisplay = document.getElementById('levelDisplay');
     const countdownDisplay = document.getElementById('countdown');
     const holesContainer = document.getElementById('holesContainer');
     const header = document.getElementById('gameHeader');
     const nicknameDisplay = document.getElementById('nicknameDisplay');
-    
-    // ❌ [수정] 오디오 재생 함수도 주석 처리합니다.
-    // function playSound(sound) {
-    //     if (sound) {
-    //       sound.currentTime = 0; 
-    //       sound.play();
-    //     }
-    // }
+    const scoreContainer = document.getElementById('scoreContainer');
+    let scoreDisplay = document.getElementById('score');
+
+    // ✅ [추가] 사운드 랜덤 재생 함수 (주석 처리)
+    /*
+    function playRandomSound(soundList, audioElement) {
+        if (!soundList || soundList.length === 0 || !audioElement) return;
+        
+        const randomIndex = Math.floor(Math.random() * soundList.length);
+        const randomSound = soundList[randomIndex];
+        
+        audioElement.src = randomSound;
+        audioElement.currentTime = 0;
+        audioElement.play().catch(e => console.error(`오디오 재생 오류 ${randomSound}:`, e));
+    }
+    */
 
     document.getElementById('startBtn').addEventListener('click', () => {
-      // ❌ [수정] 배경음악 재생 코드 주석 처리
-      // if(bgm) bgm.play().catch(e => console.log("사용자 상호작용이 필요하여 BGM 자동 재생에 실패했습니다."));
+      // ✅ [추가] 게임 시작 시 배경음악 재생 (주석 처리)
+      // playRandomSound(bgmList, bgmAudio);
 
       if (!currentUserNickname) {
         currentUserNickname = prompt("게임에서 사용할 닉네임을 입력하세요:");
@@ -292,6 +307,7 @@
           return;
         }
         nicknameDisplay.textContent = `플레이어: ${currentUserNickname}`;
+        showUserBestScore(level);
       }
       
       level = parseInt(document.getElementById('levelSelect').value);
@@ -308,7 +324,14 @@
             currentUserNickname = newNickname;
             nicknameDisplay.textContent = `플레이어: ${currentUserNickname}`;
             alert(`닉네임이 '${currentUserNickname}'(으)로 변경되었습니다.`);
+            showUserBestScore(level);
         }
+    });
+
+    document.getElementById('levelSelect').addEventListener('change', (e) => {
+        level = parseInt(e.target.value);
+        levelDisplay.textContent = `레벨: ${level}`;
+        showUserBestScore(level);
     });
 
     function startCountdown(callback) {
@@ -411,7 +434,7 @@
 
     function hitMole(e) {
       e.preventDefault();
-      // playSound(hitSound); // ❌ [수정] 타격음 재생 주석 처리
+      // playRandomSound(hitSoundList, sfxAudio); // ✅ [추가] 타격음 재생 (주석 처리)
       score++;
       molesHit++;
       scoreDisplay.textContent = score;
@@ -420,7 +443,7 @@
 
     function hitDecoy(e) {
       e.preventDefault();
-      // playSound(missSound); // ❌ [수정] 실수 효과음 재생 주석 처리
+      // playRandomSound(missSoundList, sfxAudio); // ✅ [추가] 실수 효과음 재생 (주석 처리)
       score -= 5;
       decoysHit++;
       scoreDisplay.textContent = score;
@@ -446,7 +469,9 @@
       totalMolesAppeared = 0;
       
       timeLeft = 30;
-      scoreDisplay.textContent = score;
+      scoreContainer.innerHTML = `점수: <span id="score">${score}</span>`;
+      scoreDisplay = document.getElementById('score');
+      
       timeDisplay.textContent = timeLeft;
       const holeCounts = { 1: 7, 2: 15, 3: 25, 4: 30, 5: 40 };
       createHoles(holeCounts[level]);
@@ -466,6 +491,9 @@
       clearInterval(gameInterval);
       clearInterval(timerInterval);
       document.querySelectorAll('.mole, .decoy').forEach(char => char.remove());
+
+      // ✅ [추가] 배경음악 정지 (주석 처리)
+      // if(bgmAudio) bgmAudio.pause();
 
       const baseScore = totalMolesAppeared > 0 ? (molesHit / totalMolesAppeared) * 100 : 0;
       const penalty = decoysHit * 5;
@@ -510,6 +538,7 @@
       }
 
       header.classList.remove('hidden');
+      await showUserBestScore(level);
     }
 
     function askForNextLevel() {
@@ -519,6 +548,7 @@
                 level++;
                 document.getElementById('levelSelect').value = level;
                 levelDisplay.textContent = `레벨: ${level}`;
+                showUserBestScore(level); 
                 startCountdown(() => {
                     header.classList.add('hidden');
                     startGame();
@@ -552,6 +582,35 @@
         document.getElementById('resultDisplay').style.display = 'block';
     }
     
+    async function showUserBestScore(levelToShow) {
+        if (!currentUserNickname) {
+            scoreContainer.innerHTML = `점수: <span id="score">0</span>`;
+            scoreDisplay = document.getElementById('score');
+            return;
+        }
+
+        const scoresRef = ref(db, `rankings/level${levelToShow}`);
+        const userQuery = query(scoresRef, orderByChild('name'), equalTo(currentUserNickname));
+
+        try {
+            const snapshot = await get(userQuery);
+            if (snapshot.exists()) {
+                let bestScore = -1;
+                snapshot.forEach(child => {
+                    bestScore = child.val().score;
+                });
+                scoreContainer.innerHTML = `최고점수: <span id="score">${bestScore}</span>`;
+            } else {
+                scoreContainer.innerHTML = `최고점수: <span id="score">기록 없음</span>`;
+            }
+            scoreDisplay = document.getElementById('score');
+        } catch (err) {
+            console.error("최고 점수 조회 실패:", err);
+            scoreContainer.innerHTML = `최고점수: <span id="score">조회 실패</span>`;
+            scoreDisplay = document.getElementById('score');
+        }
+    }
+
     async function loadRanking(level) {
       const scoresRef = ref(db, `rankings/level${level}`);
       const rankingContent = document.getElementById('rankingContent');
